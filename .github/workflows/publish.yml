@@ -1,0 +1,119 @@
+name: Publish
+
+# Publishes to npm using OIDC trusted publishing — no long-lived npm token is
+# stored anywhere in this repository.
+#
+# One-time setup on npmjs.com (package → Settings → Trusted publishing):
+#   Provider:            GitHub Actions
+#   Organization or user: fatihdogann
+#   Repository:          turkce-tarih
+#   Workflow filename:   publish.yml
+#   Allowed actions:     npm publish / npm stage publish
+#
+# Publishing rules:
+#   * A real publish happens ONLY when a `v*` tag is pushed.
+#   * Running this workflow manually can never publish — it dry-runs only.
+#   * `id-token: write` exists only in the publish job; the verify job has no
+#     OIDC permission at all.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      # Trusted publishing needs npm CLI >= 11.5.1 and Node >= 22.14.0.
+      - name: Ensure a trusted-publishing capable npm
+        run: npm install -g npm@11
+
+      - name: Install
+        run: npm ci
+
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Check the built output exists
+        run: |
+          test -f dist/index.js || { echo "::error::dist/index.js missing"; exit 1; }
+          test -f dist/cli.js || { echo "::error::dist/cli.js missing"; exit 1; }
+          head -1 dist/cli.js | grep -q '^#!/usr/bin/env node$' \
+            || { echo "::error::dist/cli.js is missing its shebang"; exit 1; }
+
+      - name: Check the tag matches package.json
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          pkg="$(node -p "require('./package.json').version")"
+          echo "tag=$tag package.json=$pkg"
+          if [ "$tag" != "$pkg" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match package.json version $pkg"
+            exit 1
+          fi
+
+      # Manual runs stop here. `npm pack --dry-run` builds and lists the exact
+      # tarball without contacting the registry, so it can never publish and it
+      # does not fail on an already-published version the way
+      # `npm publish --dry-run` does.
+      - name: Dry run (cannot publish)
+        if: github.event_name == 'workflow_dispatch'
+        run: npm pack --dry-run
+
+  publish:
+    name: Publish
+    needs: verify
+    # A real publish requires a *pushed* v* tag. workflow_dispatch can be
+    # started against a tag ref too, so the event name has to be part of the
+    # condition — otherwise a manual run could publish.
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write # OIDC; npm exchanges this for a short-lived publish token
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Ensure a trusted-publishing capable npm
+        run: npm install -g npm@11
+
+      - name: Install
+        run: npm ci
+
+      # Provenance is attached automatically for trusted publishing from
+      # GitHub Actions — no --provenance flag, and no token in the environment.
+      - name: Publish to npm
+        run: npm publish --access public
+
+      - name: Summary
+        run: |
+          echo "### Published" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- version: \`$(node -p "require('./package.json').version")\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- ref: \`$GITHUB_REF\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- npm: https://www.npmjs.com/package/turkce-tarih" >> "$GITHUB_STEP_SUMMARY"

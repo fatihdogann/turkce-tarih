@@ -39,6 +39,14 @@
   ],
   "author": "Mehmet Fatih Doğan <fatihdogann5@outlook.com>",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fatihdogann/turkce-tarih.git"
+  },
+  "homepage": "https://github.com/fatihdogann/turkce-tarih#readme",
+  "bugs": {
+    "url": "https://github.com/fatihdogann/turkce-tarih/issues"
+  },
   "devDependencies": {
     "@types/node": "^26.6.6",
     "typescript": "^5.6.0"
