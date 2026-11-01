@@ -118,13 +118,14 @@ All results below use reference **Sunday 2026-11-01 10:00 (Europe/Istanbul, UTC+
 
 ## Supported patterns
 
-- **Relative days:** `bugün`, `yarın`, `dün`, `öbür gün`, `evvelsi gün`, `önceki gün` — with suffixes (`yarına`, `yarınki`, `bugünkü`).
-- **Relative durations:** `{n} gün|hafta|ay|yıl|saat|dakika|dk|sn önce|sonra` — digits (`3 gün sonra`) and number words `bir`–`on` (`üç gün sonra`), plus `yarım saat önce/sonra`.
+- **Relative days:** `bugün`, `yarın`, `dün`, `öbür gün`, `yarından sonra`, `ertesi gün`, `evvelsi gün`, `önceki gün` — with suffixes (`yarına`, `yarınki`, `bugünkü`).
+- **Relative durations:** `{n} gün|hafta|ay|yıl|saat|dakika|dk|sn önce|sonra` — digits (`3 gün sonra`), decimals (`1,5 saat sonra`, `1.5 saat sonra`), number words up to 69 (`üç`, `on iki`, `yirmi beş`), `buçuk` (`bir buçuk saat sonra`) and `yarım`. The dative form means "in": `10 dakikaya`, `2 güne`. Fractional months add 30-day fractions (`1,5 ay` = 1 month 15 days).
 - **Weekdays:** all seven, bare (`salı`, `salıya`, `salı günü`), `bu X`, `haftaya X`, `önümüzdeki/gelecek (hafta) X`, `geçen/önceki X`, `geçen hafta X`. Weeks start on Monday.
 - **Month words:** `geçen/bu/önümüzdeki/gelecek hafta|ay|yıl`, `haftaya`.
-- **Dates:** `15 Kasım`, `15 Kasım 2026`, `15 kasım'da`, `Kasım 15`, `Kasım'ın 15'i`, `ayın 15'i/15'inde`, bare `15'inde`, numeric `15.11.2026`, `15/11`, `15-11-2026`, two-digit years (`15.11.26` → 2026).
-- **Times:** `14:30`, `14.30` (+ suffix: `14:30'da`), `saat 14.30`, `saat 9`, bare hours with locative suffix (`7'de`, `9da`, `dokuzda`, `on'da`), `7 buçuk(ta)`, hour words (`ikide`, `yedide`), day-part words alone (`sabah`, `öğlen`, `öğleden sonra`, `akşam`, `gece`, `sabaha karşı`) or with an hour (`akşam 7'de`, `öğlen 3'te`, `gece 11'de`), `gece yarısı`.
-- **Find-in-text:** date and time parts are located anywhere in the text and combined; the remainder is returned in `rest`.
+- **Period ends/starts:** `hafta sonu` (next Saturday; today on a weekend), `hafta başı` (next Monday), `ay sonu`, `ay başı` (today on the 1st, otherwise the 1st of next month), `yıl sonu`, `yıl başı`, `Kasım sonunda`, `aralık başında` — with suffixes (`sonuna`, `başında`).
+- **Dates:** `15 Kasım`, `15 Kasım 2026`, `15 kasım'da`, `Kasım 15`, `Kasım'ın 15'i`, `ayın 15'i/15'inde`, bare `15'inde`, numeric `15.11.2026`, `15/11`, `15-11-2026`, ISO `2026-11-15`, two-digit years (`15.11.26` → 2026).
+- **Times:** `14:30`, `14.30` (+ suffix: `14:30'da`), `saat 14.30`, `saat 9`, bare hours with locative suffix (`7'de`, `9da`, `dokuzda`, `on'da`), `7 buçuk(ta)`, hour words (`ikide`, `yedide`, `on birde`), quarters (`3'ü çeyrek geçe`, `dörde çeyrek var/kala`, `akşam 7'yi çeyrek geçe`), dative hours (`9'a kadar`), day-part words alone (`sabah`, `öğlen`, `öğleden sonra`, `akşamüstü`, `akşam`, `gece`, `sabaha karşı`) or with an hour (`akşam 7'de`, `öğlen 3'te`, `gece 11'de`), `gece yarısı`.
+- **Find-in-text:** date and time parts are located anywhere in the text and combined; the remainder is returned in `rest`. A trailing `kadar` (`salıya kadar`) and `günü` (`Cuma günü`) belong to the match, not to `rest`.
 
 ### Day-part hour mapping
 
@@ -133,9 +134,10 @@ All results below use reference **Sunday 2026-11-01 10:00 (Europe/Istanbul, UTC+
 | `sabah h`             | `h` as-is (00–12)                                 |
 | `öğlen h`             | `h + 12` for 1–11, `12` → 12:00                   |
 | `öğleden sonra h`     | `h + 12` for 1–11                                 |
+| `akşamüstü h`         | `h + 12` for 1–11                                 |
 | `akşam h`             | `h + 12` for 1–11, `12` → 00:00                   |
 | `gece h`              | `h` for 1–6, `h + 12` for 7–11, `12` → 00:00      |
-| day-part alone        | sabah 09:00 · sabaha karşı 06:00 · öğlen 12:00 · öğleden sonra 15:00 · akşam 19:00 · gece 22:00 |
+| day-part alone        | sabah 09:00 · sabaha karşı 06:00 · öğlen 12:00 · öğleden sonra 15:00 · akşamüstü 17:00 · akşam 19:00 · gece 22:00 |
 
 ### Ambiguity rules (deterministic, documented)
 
@@ -153,8 +155,8 @@ All results below use reference **Sunday 2026-11-01 10:00 (Europe/Istanbul, UTC+
 - **Recurring expressions:** `her pazartesi`, `her gün` parse as the single next occurrence; the recurring part is ignored, not returned.
 - **Ranges:** `15-20 Kasım`, `9 ile 12 arası`.
 - **`N gün içinde`** ("within N days") and `N günde bir` ("every N days").
-- **`hafta sonu`, `ay sonu/başı`, `çeyrek`**, `9 sularında`, `9'u gibi` (accusative time forms), `önümüzdeki günlerde`.
-- **Compound number words:** `on bir`, `yirmi üç` — only number words 1–10 and `yarım` are supported; `saat on bir` returns `null`.
+- `9 sularında`, `9'u gibi`, `önümüzdeki günlerde`, minutes past/to other than quarters (`10'u 20 geçe`), and `çeyrek geçe` without an hour.
+- **Number words** go up to 69 for durations and up to 12 for hours (`saat on iki`); larger numbers need digits.
 - **Bare digits/hours without a suffix, separator or `saat`:** `9 elma` does not parse as a time; standalone month names (`Kasım'da` alone) and years (`2026'da`) do not parse.
 - **Invalid calendar dates** return `null`: `31 Nisan`, `30.2`, `24:00` as a time.
 - **One datetime per text:** `yarın veya salı` returns the first date; `yarın 9'da 10'da` returns the time nearest to the date.

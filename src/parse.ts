@@ -151,12 +151,34 @@ const MONTHS: Record<string, number> = {
   temmuz: 7, ağustos: 8, eylül: 9, ekim: 10, kasım: 11, aralık: 12,
 };
 
-const NUMW = "(?:(?<!on\\s)(?:bir|iki|üç|dört|beş|altı|yedi|sekiz|dokuz)|on(?!\\s*(?:bir|iki|üç|dört|beş|altı|yedi|sekiz|dokuz|on)\\b))";
+const NUMW = "(?:on\\s+(?:bir|iki)|(?<!on\\s)(?:bir|iki|üç|dört|beş|altı|yedi|sekiz|dokuz)|on(?!\\s*(?:bir|iki|üç|dört|beş|altı|yedi|sekiz|dokuz|on)\\b))";
 
 const NUMBER_WORDS: Record<string, number> = {
   bir: 1, iki: 2, üç: 3, dört: 4, beş: 5, altı: 6,
-  yedi: 7, sekiz: 8, dokuz: 9, on: 10,
+  yedi: 7, sekiz: 8, dokuz: 9, on: 10, "on bir": 11, "on iki": 12,
 };
+const hourWord = (s: string) => NUMBER_WORDS[s.replace(/\s+/g, " ")];
+
+// Süre sayıları: "yirmi beş", "on iki", "bir buçuk", "1,5", "yarım".
+const UNITS_W = "bir|iki|üç|dört|beş|altı|yedi|sekiz|dokuz";
+const TENS: Record<string, number> = { on: 10, yirmi: 20, otuz: 30, kırk: 40, elli: 50, altmış: 60 };
+const COUNTW = `(?:(?:on|yirmi|otuz|kırk|elli|altmış)(?:\\s+(?:${UNITS_W}))?|${UNITS_W})`;
+const COUNT = `(?:yarım|(?:\\d{1,3}(?:[.,]\\d)?|${COUNTW})(?:\\s+buçuk)?)`;
+
+function countValue(raw: string): number | null {
+  const s = raw.replace(/\s+/g, " ").trim();
+  if (s === "yarım") return 0.5;
+  const half = s.endsWith(" buçuk") ? 0.5 : 0;
+  const core = half ? s.slice(0, -" buçuk".length) : s;
+  if (/^\d/.test(core)) return Number(core.replace(",", ".")) + half;
+  let total = 0;
+  for (const tok of core.split(" ")) {
+    const v = TENS[tok] ?? NUMBER_WORDS[tok];
+    if (v === undefined) return null;
+    total += v;
+  }
+  return total + half;
+}
 
 // Gün bölümü varsayılanları (metinde saat yoksa)
 const DAYPART_DEFAULT: Record<string, [number, number]> = {
@@ -165,9 +187,13 @@ const DAYPART_DEFAULT: Record<string, [number, number]> = {
   öğle: [12, 0],
   öğlen: [12, 0],
   "öğleden sonra": [15, 0],
+  "akşamüstü": [17, 0],
   akşam: [19, 0],
   gece: [22, 0],
 };
+
+// "akşam üstü" ve "akşamüstü" aynı anahtara; diğer çok kelimeliler tek boşlukla.
+const daypart = (s: string) => s.replace(/\s+/g, " ").replace("akşam üstü", "akşamüstü");
 
 // Gün bölümü + saat eşlemesi (belirsiz saati gün bölümüne göre çözer)
 function mapDaypart(dp: string, h: number): number {
@@ -179,6 +205,7 @@ function mapDaypart(dp: string, h: number): number {
     case "öğlen":
       return h === 12 ? 12 : h < 12 ? h + 12 : h;
     case "öğleden sonra":
+    case "akşamüstü":
       return h < 12 ? h + 12 : h;
     case "akşam":
       return h < 12 ? h + 12 : h === 12 ? 0 : h;
@@ -204,13 +231,13 @@ const APOS = `(?:['’][${L}]+)?`;
 const NUM = String.raw`\d{1,2}`;
 const WS = String.raw`\s+`;
 
-const REL = `bugün|yarın|dün|öbür${WS}gün|evvelsi${WS}gün|önceki${WS}gün`;
+const REL = `yarından${WS}sonra|ertesi${WS}gün|bugün|yarın|dün|öbür${WS}gün|evvelsi${WS}gün|önceki${WS}gün`;
 const SFX_REL = `(?:['’][${L}]+|(?:n)?(?:a|e|[ıiuü]|da|de|ta|te|ın|in|un|ün)|n?k[ıiuü]|ce)?`;
 
 const WD_ALT = "pazartesi|cumartesi|salı|çarşamba|perşembe|cuma|pazar";
-const SFX_WD = `(?:['’][${L}]+|gün(?:ü|ün(?:de|kü)?)?|y?(?:a|e|[ıiuü]|da|de|ta|te|nın|nin|ın|in)|(?:d[ae])?k[ıiuü])?`;
+const SFX_WD = `(?:\\s+gün(?:ü|ün(?:de|e|kü)?)?|['’][${L}]+|gün(?:ü|ün(?:de|kü)?)?|y?(?:a|e|[ıiuü]|da|de|ta|te|nın|nin|ın|in)|(?:d[ae])?k[ıiuü])?`;
 
-const DP_ALT = `sabaha\\s*karşı|öğleden\\s*sonra|öğlen|öğle|sabah|akşam|gece`;
+const DP_ALT = `sabaha\\s*karşı|öğleden\\s*sonra|akşam\\s*üstü|öğlen|öğle|sabah|akşam|gece`;
 const SFX_DP = `(?:['’][${L}]+|leyin|leri?|ları|nki|ki|deki?|y?(?:a|e|[ıiuü]))?`;
 
 const MONTH_ALT = "ocak|şubat|mart|nisan|mayıs|haziran|temmuz|ağustos|eylül|ekim|kasım|aralık";
@@ -219,7 +246,7 @@ const SFX_MONTH = `(?:['’][${L}]+|['’]?(?:ın|in|unda|ünde|da|de|ta|te|a|e)
 // Saat biçimleri
 const HSEP = `(${NUM})[:.](${NUM})(?:${APOS})`; // 14:30, 14.30'da
 const HBU = `(?:\\s*(buçuk)(?:t[ae])?)?`; // 7 buçuk(ta)
-const HDIG = `(${NUM})(?:['’]?(?:d[ae]|t[ae]))?${HBU}`; // 9, 9'da, 9da, 7 buçukta
+const HDIG = `(${NUM})(?:['’]?(?:d[ae]|t[ae])|['’]y?[ae])?${HBU}`; // 9, 9'da, 9da, 9'a, 7 buçukta
 const HWORD = `(${NUMW})(?:['’]?(?:d[ae]|t[ae]))?`; // saat dokuz, dokuz(da), on'da
 const HWORD_LOC = `(${NUMW})['’]?(?:d[ae]|t[ae])`; // kelime saat + bulunma eki zorunlu
 
@@ -312,9 +339,48 @@ function futureMonthDay(ref: Wall, m: number, d: number, conf: number): Omit<Can
 const PATTERNS: Pattern[] = [
   // ---- TARİH ----
   {
+    // 2026-11-15 (ISO)
+    kind: "date",
+    re: new RegExp(`${PRE_NUM}(\\d{4})-(\\d{1,2})-(\\d{1,2})${POST_ND}`, "g"),
+    make(m) {
+      return absDate(n(m[1]), n(m[2]), n(m[3]), 0.95);
+    },
+  },
+  {
+    // hafta sonu, ay sonu, yıl sonu, ay başı, hafta başı, Kasım sonunda, Aralık başında
+    kind: "date",
+    re: new RegExp(`${PRE}(hafta|ay|yıl|sene|${MONTH_ALT})${WS}(son|baş)(?:u|ı|una|ına|unda|ında)?${POST}`, "g"),
+    make(m, ctx) {
+      const end = m[2] === "son";
+      const r = ctx.ref;
+      let t: { y: number; m: number; d: number };
+      if (m[1] === "hafta") {
+        // Hafta sonu: gelecek cumartesi (bugün hafta sonuysa bugün). Hafta başı: gelecek pazartesi.
+        const td = dow(r.y, r.m, r.d);
+        t = end ? (td >= 5 ? { y: r.y, m: r.m, d: r.d } : wdNext(r, 5, "next")) : wdNext(r, 0, td === 0 ? "next" : "nextWeek");
+      } else if (m[1] === "ay") {
+        if (end) t = { y: r.y, m: r.m, d: daysInMonth(r.y, r.m) };
+        else {
+          const b = addMonthsW({ ...r, d: 1 }, r.d === 1 ? 0 : 1);
+          t = { y: b.y, m: b.m, d: 1 };
+        }
+      } else if (m[1] === "yıl" || m[1] === "sene") {
+        t = end ? { y: r.y, m: 12, d: 31 } : { y: r.m === 1 && r.d === 1 ? r.y : r.y + 1, m: 1, d: 1 };
+      } else {
+        const mo = MONTHS[m[1]];
+        if (!mo) return null;
+        // Ayın sonu/başı: o ayın son ya da ilk günü, geçmişte kaldıysa gelecek yıl.
+        const y = mo > r.m || (mo === r.m && (end || r.d === 1)) ? r.y : r.y + 1;
+        t = { y, m: mo, d: end ? daysInMonth(y, mo) : 1 };
+      }
+      return { kind: "date", date: { ...t, past: false }, dConf: 0.85 };
+    },
+  },
+  {
     // 15.11.2026, 15/11, 15-11-2026, 15.11.26
     kind: "date",
-    re: new RegExp(`${PRE_NUM}(${NUM})[./-](${NUM})(?:[./-](\\d{4}|\\d{2}))?${APOS}${POST_ND}`, "g"),
+    // "1.5 saat sonra" bir süredir, 1 Mayıs değil.
+    re: new RegExp(`${PRE_NUM}(${NUM})[./-](${NUM})(?:[./-](\\d{4}|\\d{2}))?${APOS}${POST_ND}(?!${WS}(?:saat|dakika|dk|sn|saniye|gün|hafta|ay|yıl)(?![${L}]))`, "g"),
     make(m, ctx) {
       const d = n(m[1]), mo = n(m[2]);
       if (m[3] !== undefined) {
@@ -402,6 +468,8 @@ const PATTERNS: Pattern[] = [
         "öbür gün": [2, false],
         "evvelsi gün": [-2, true],
         "önceki gün": [-1, true],
+        "yarından sonra": [2, false],
+        "ertesi gün": [1, false],
       };
       const key = m[1].replace(/\s+/g, " ");
       const hit = off[key];
@@ -415,7 +483,7 @@ const PATTERNS: Pattern[] = [
     kind: "date",
     re: new RegExp(`${PRE}bu${WS}(${DP_ALT})${SFX_DP}${POST}`, "g"),
     make(m, ctx) {
-      const dp = m[1].replace(/\s+/g, " ");
+      const dp = daypart(m[1]);
       const [hh, mm] = DAYPART_DEFAULT[dp] ?? [0, 0];
       return {
         kind: "date",
@@ -427,50 +495,32 @@ const PATTERNS: Pattern[] = [
     },
   },
   {
-    // süreler: 3 gün sonra, 2 hafta önce, yarım saat sonra, 45 dakika sonra...
+    // süreler: 3 gün sonra, 1,5 saat sonra, bir buçuk saat sonra, yirmi gün önce, 10 dakikaya
     kind: "date",
     re: new RegExp(
-      `${PRE}(yarım${WS}saat|\\d{1,3}${WS}(?:saat|dakika|dk|sn|saniye|gün|hafta|ay|yıl)|(${NUMW})${WS}(?:saat|dakika|gün|hafta|ay|yıl))${WS}(sonra|sonrası|önce|öncesinde|evvel)${POST}`,
+      `(?<![\\d.,${L}])(${COUNT})${WS}(saat|dakika|dk|sn|saniye|gün|hafta|ay|yıl)(?:(?<=saat)e|(?<=dakika)ya|(?<=gün)e|(?<=hafta)ya|(?<=ay)a|(?<=yıl)a|${WS}(sonra|sonrası|önce|öncesinde|evvel))${POST}`,
       "g",
     ),
     make(m, ctx) {
-      const dir = m[3] === "sonra" || m[3] === "sonrası" ? 1 : -1;
+      // Yönelme eki ("10 dakikaya", "2 güne") ileriyi anlatır.
+      const dir = m[3] === undefined || m[3] === "sonra" || m[3] === "sonrası" ? 1 : -1;
       const past = dir < 0;
+      const val = countValue(m[1]);
+      if (val === null || val <= 0) return null;
+      const unit = m[2];
       const keepRefTime: TimePart = { hh: ctx.ref.hh, mm: ctx.ref.mm, ss: ctx.ref.ss, mode: "fixed" };
-      let months = 0;
-      let ms = 0;
-      if (m[1].startsWith("yarım")) {
-        ms = 30 * 60000;
-      } else {
-        const dm = /(\d{1,3})\s*(saat|dakika|dk|sn|saniye|gün|hafta|ay|yıl)/.exec(m[1]);
-        let val: number, unit: string;
-        if (dm) {
-          val = Number(dm[1]);
-          unit = dm[2];
-        } else {
-          const wm = new RegExp(`(${NUMW})\\s*(saat|dakika|gün|hafta|ay|yıl)$`).exec(m[1]);
-          if (!wm) return null;
-          val = NUMBER_WORDS[wm[1]];
-          unit = wm[2];
-          if (val === undefined) return null;
-        }
-        if (unit === "ay") months = dir * val;
-        else if (unit === "yıl") months = dir * val * 12;
-        else {
-          const unitMs: Record<string, number> = {
-            saat: 3600000, dakika: 60000, dk: 60000, sn: 1000, saniye: 1000,
-            gün: 86400000, hafta: 7 * 86400000,
-          };
-          const u = unitMs[unit];
-          if (!u) return null;
-          ms = val * u;
-        }
-      }
-      if (months !== 0) {
-        const b = addMonthsW(ctx.ref, months);
+      if (unit === "ay" || unit === "yıl") {
+        const total = unit === "yıl" ? val * 12 : val;
+        const whole = Math.trunc(total);
+        // Ayın kesirli kısmı 30 günlük ay üzerinden gün olarak eklenir ("1,5 ay" = 1 ay 15 gün).
+        const b = addDaysW(addMonthsW(ctx.ref, dir * whole), dir * Math.round((total - whole) * 30));
         return { kind: "date", date: { y: b.y, m: b.m, d: b.d, past }, dConf: 0.9, time: keepRefTime };
       }
-      const w = wallFromMs(asUTCms(ctx.ref) + dir * ms);
+      const unitMs: Record<string, number> = {
+        saat: 3600000, dakika: 60000, dk: 60000, sn: 1000, saniye: 1000,
+        gün: 86400000, hafta: 7 * 86400000,
+      };
+      const w = wallFromMs(asUTCms(ctx.ref) + dir * Math.round(val * unitMs[unit]));
       return {
         kind: "date",
         date: { y: w.y, m: w.m, d: w.d, past },
@@ -542,6 +592,31 @@ const PATTERNS: Pattern[] = [
 
   // ---- SAAT ----
   {
+    // 3'ü çeyrek geçe, üçü çeyrek geçe, 4'e çeyrek var, dörde çeyrek kala, akşam 7'yi çeyrek geçe
+    kind: "time",
+    re: new RegExp(
+      `(?:${PRE}(${DP_ALT})${SFX_DP}\\s*)?${PRE_NUM}(${NUM}|on\\s+bir|on\\s+iki|dörd|${UNITS_W}|on)['’]?(?:(y?[ıiuü])|(y?[ae]))${WS}çeyrek${WS}(geçe|var|kala)(?:d[ae]|t[ae])?${POST}`,
+      "g",
+    ),
+    make(m) {
+      // Ünsüz yumuşaması: dört → dörde/dördü, on bir → on biri.
+      const word = m[2].replace(/\s+/g, " ").replace(/^dörd$/, "dört");
+      const h = /^\d/.test(word) ? n(word) : hourWord(word);
+      if (h === undefined || h > 23 || h === 0) return null;
+      const after = m[5] === "geçe";
+      // geçe → belirtme eki, var/kala → yönelme eki
+      if (after ? !m[3] : !m[4]) return null;
+      let hh = after ? h : (h + 23) % 24;
+      const mm = after ? 15 : 45;
+      if (m[1]) {
+        hh = mapDaypart(daypart(m[1]), hh);
+        return { kind: "time", time: { hh, mm, ss: 0, mode: "fixed" }, dConf: 0, tConf: 0.9 };
+      }
+      const mode: TimePart["mode"] = hh >= 13 ? "explicit" : "ambiguous";
+      return { kind: "time", time: { hh, mm, ss: 0, mode }, dConf: 0, tConf: 0.85 };
+    },
+  },
+  {
     // gece yarısı
     kind: "time",
     re: new RegExp(`${PRE}gece\\s*yarısı${APOS}${POST}`, "g"),
@@ -554,7 +629,7 @@ const PATTERNS: Pattern[] = [
     kind: "time",
     re: new RegExp(`${PRE}(${DP_ALT})${SFX_DP}\\s*(?:saat\\s*)?(?:${HSEP}|${HDIG}|${HWORD_LOC})${POST}`, "g"),
     make(m) {
-      const dp = m[1].replace(/\s+/g, " ");
+      const dp = daypart(m[1]);
       if (m[2] !== undefined && m[3] !== undefined) {
         const hh = n(m[2]), mm = n(m[3]);
         if (hh > 23 || mm > 59) return null;
@@ -567,7 +642,7 @@ const PATTERNS: Pattern[] = [
         return { kind: "time", time: { hh: mapDaypart(dp, raw), mm, ss: 0, mode: "fixed" }, dConf: 0, tConf: 0.85 };
       }
       if (m[6] !== undefined) {
-        const raw = NUMBER_WORDS[m[6]];
+        const raw = hourWord(m[6]);
         if (raw === undefined || raw > 23) return null;
         return { kind: "time", time: { hh: mapDaypart(dp, raw), mm: 0, ss: 0, mode: "fixed" }, dConf: 0, tConf: 0.85 };
       }
@@ -579,7 +654,7 @@ const PATTERNS: Pattern[] = [
     kind: "time",
     re: new RegExp(`${PRE}(${DP_ALT})${SFX_DP}${POST}`, "g"),
     make(m) {
-      const dp = m[1].replace(/\s+/g, " ");
+      const dp = daypart(m[1]);
       const [hh, mm] = DAYPART_DEFAULT[dp] ?? [0, 0];
       return { kind: "time", time: { hh, mm, ss: 0, mode: "fixed" }, dConf: 0, tConf: 0.8 };
     },
@@ -602,7 +677,7 @@ const PATTERNS: Pattern[] = [
         return { kind: "time", time: { hh, mm, ss: 0, mode }, dConf: 0, tConf: mode === "ambiguous" ? 0.75 : 0.95 };
       }
       if (m[5] !== undefined) {
-        const hh = NUMBER_WORDS[m[5]];
+        const hh = hourWord(m[5]);
         if (hh === undefined || hh > 23) return null;
         const mode: TimePart["mode"] = hh >= 13 || hh === 0 ? "explicit" : "ambiguous";
         return { kind: "time", time: { hh, mm: 0, ss: 0, mode }, dConf: 0, tConf: mode === "ambiguous" ? 0.75 : 0.95 };
@@ -614,7 +689,7 @@ const PATTERNS: Pattern[] = [
     // çıplak saat: 14:30, 9da, 9'da, 7 buçukta, dokuzda
     kind: "time",
     re: new RegExp(
-      `${PRE_NUM}(?:${HSEP}|(${NUM})(?:['’]?(?:d[ae]|t[ae]))${HBU}|(${NUM})\\s*buçuk(?:t[ae])?|${HWORD_LOC})${POST}`,
+      `${PRE_NUM}(?:${HSEP}|(${NUM})(?:['’]?(?:d[ae]|t[ae])|['’]y?[ae])${HBU}|(${NUM})\\s*buçuk(?:t[ae])?|${HWORD_LOC})${POST}`,
       "g",
     ),
     make(m) {
@@ -632,7 +707,7 @@ const PATTERNS: Pattern[] = [
         hh = n(m[5]);
         mm = 30;
       } else if (m[6] !== undefined) {
-        hh = NUMBER_WORDS[m[6]];
+        hh = hourWord(m[6]);
       }
       if (hh === undefined || hh > 23) return null;
       const mode: TimePart["mode"] = m[1] !== undefined || hh >= 13 || hh === 0 ? "explicit" : "ambiguous";
@@ -799,6 +874,10 @@ export function parseTr(text: string, options: ParseTrOptions = {}): ParseTrResu
   else confidence = (tc ?? 0.5) * 0.9;
   confidence = Math.round(confidence * 100) / 100;
 
+  for (const c of [dateCand, timeCand]) {
+    const k = c && new RegExp(`^\\s*kadar(?![${L}])`).exec(norm.slice(c.end));
+    if (c && k) c.end += k[0].length;
+  }
   const spans: Array<{ start: number; end: number }> = [];
   if (dateCand) spans.push(dateCand);
   if (timeCand) spans.push(timeCand);

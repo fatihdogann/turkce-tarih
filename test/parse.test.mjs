@@ -208,7 +208,63 @@ eq("12'de", `${D}T12:00:00+03:00`);
 eq("akşam 10'da", `${D}T22:00:00+03:00`);
 eq("akşam 19'da", `${D}T19:00:00+03:00`);
 eq("sabah 12'de", `${D}T12:00:00+03:00`);
-check("saat on bir", (r) => assert.equal(r, null)); // bileşik kelime sayılar desteklenmez
+eq("saat on bir", `${D}T11:00:00+03:00`);
+eq("saat on ikide", `${D}T12:00:00+03:00`);
+
+// ---------- 0.2.0: kesirli ve bileşik süreler ----------
+eq("1,5 saat sonra", `${D}T11:30:00+03:00`);
+eq("1.5 saat sonra", `${D}T11:30:00+03:00`); // 1 Mayıs değil
+eq("bir buçuk saat sonra", `${D}T11:30:00+03:00`);
+eq("2 buçuk saat sonra", `${D}T12:30:00+03:00`);
+eq("yirmi gün sonra", "2026-11-21T10:00:00+03:00");
+eq("yirmi beş dakika sonra", `${D}T10:25:00+03:00`);
+eq("on iki saat önce", "2026-10-31T22:00:00+03:00");
+eq("1,5 ay sonra", "2026-12-16T10:00:00+03:00");
+eq("10 dakikaya", `${D}T10:10:00+03:00`);
+eq("2 güne", "2026-11-03T10:00:00+03:00");
+
+// ---------- 0.2.0: göreli günler, gün bölümleri, ISO ----------
+eq("yarından sonra", "2026-11-03T09:00:00+03:00");
+eq("ertesi gün", "2026-11-02T09:00:00+03:00");
+eq("akşamüstü", `${D}T17:00:00+03:00`);
+eq("yarın akşam üstü 5'te", "2026-11-02T17:00:00+03:00");
+eq("2026-11-15", "2026-11-15T09:00:00+03:00");
+eq("2026-11-15 14:30", "2026-11-15T14:30:00+03:00");
+isNull("2026-02-30");
+
+// ---------- 0.2.0: dönem sonu/başı ----------
+eq("hafta sonu", `${D}T09:00:00+03:00`); // referans pazar: bugün hafta sonu
+eq("hafta sonu", "2026-11-07T09:00:00+03:00", { referenceDate: new Date("2026-11-03T10:00:00+03:00") });
+eq("hafta başı", "2026-11-02T09:00:00+03:00");
+eq("ay sonu", "2026-11-30T09:00:00+03:00");
+eq("ay sonuna kadar", "2026-11-30T09:00:00+03:00");
+eq("ay başı", `${D}T09:00:00+03:00`); // bugün ayın 1'i
+eq("yıl sonu", "2026-12-31T09:00:00+03:00");
+eq("Kasım sonunda", "2026-11-30T09:00:00+03:00");
+eq("aralık başında", "2026-12-01T09:00:00+03:00");
+eq("ekim sonu", "2027-10-31T09:00:00+03:00");
+
+// ---------- 0.2.0: çeyrek ----------
+eq("3'ü çeyrek geçe", `${D}T15:15:00+03:00`);
+eq("üçü çeyrek geçe", `${D}T15:15:00+03:00`);
+eq("4'e çeyrek var", `${D}T15:45:00+03:00`);
+eq("dörde çeyrek kala", `${D}T15:45:00+03:00`);
+eq("akşam 7'yi çeyrek geçe", `${D}T19:15:00+03:00`);
+eq("yarın sabah dokuzu çeyrek geçe", "2026-11-02T09:15:00+03:00");
+
+// ---------- 0.2.0: "günü" ve "kadar" kalan metne kalmaz ----------
+check("Cuma günü toplantı", (r) => {
+  assert.equal(toIso(r.date), "2026-11-06T09:00:00+03:00");
+  assert.equal(r.rest, "toplantı");
+});
+check("salıya kadar raporu bitir", (r) => {
+  assert.equal(r.matchedText, "salıya kadar");
+  assert.equal(r.rest, "raporu bitir");
+});
+check("sabah 9'a kadar", (r) => {
+  assert.equal(toIso(r.date), "2026-11-02T09:00:00+03:00");
+  assert.equal(r.rest, "");
+});
 
 // ---------- Metin içinden bulma (bileşim) ----------
 check("yarın 9'da diş hekimi", (r) => {
