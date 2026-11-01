@@ -1,0 +1,46 @@
+{
+  "name": "turkce-tarih",
+  "version": "0.1.0",
+  "description": "Zero-dependency Turkish natural-language date/time parser (library + CLI). Parses expressions like \"yarın akşam 7'de\" into Date objects.",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "bin": {
+    "turkce-tarih": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "tsc && node --test test/parse.test.mjs test/cli.test.mjs",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "turkish",
+    "date",
+    "time",
+    "parser",
+    "natural-language",
+    "chrono",
+    "zero-dependency",
+    "typescript"
+  ],
+  "author": "Mehmet Fatih Doğan <fatihdogann5@outlook.com>",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "typescript": "^5.6.0"
+  }
+}
