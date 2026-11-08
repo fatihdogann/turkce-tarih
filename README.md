@@ -1,6 +1,7 @@
 # turkce-tarih
 
 [![CI](https://github.com/fatihdogann/turkce-tarih/actions/workflows/ci.yml/badge.svg)](https://github.com/fatihdogann/turkce-tarih/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/turkce-tarih.svg)](https://www.npmjs.com/package/turkce-tarih)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![node](https://img.shields.io/badge/node-%E2%89%A520-green.svg)](package.json)
 
@@ -11,7 +12,9 @@ Parses Turkish natural language date/time expressions like `"yarın akşam 7'de"
 ```js
 import { parseTr, toIso } from "turkce-tarih";
 
-parseTr("yarın akşam 7'de diş hekimi");
+parseTr("yarın akşam 7'de diş hekimi", {
+  referenceDate: new Date("2026-11-01T10:00:00+03:00"),
+});
 // → {
 //     date: 2026-11-02T16:00:00.000Z,        // 19:00 Europe/Istanbul
 //     matchedText: "yarın akşam 7'de",
@@ -177,7 +180,7 @@ Treat it as a rough signal for filtering, not a probability.
 ## Development
 
 ```bash
-npm test     # build + 215 node:test assertions
+npm test     # build and run the test suite
 npm run build
 ```
 
@@ -186,3 +189,12 @@ Tests pin the reference to **2026-11-01 (Sunday) 10:00 Europe/Istanbul** — a f
 ## License
 
 [MIT](LICENSE) © Mehmet Fatih Doğan
+
+## Developer
+
+**Mehmet Fatih Doğan** — Software Developer.
+
+- 🌐 Portfolio & Contact: [mehmetfatihdogan.com.tr](https://mehmetfatihdogan.com.tr)
+- 💻 GitHub: [@fatihdogann](https://github.com/fatihdogann)
+
+For questions, bug reports, or feedback about this project, feel free to contact me through [my website](https://mehmetfatihdogan.com.tr).
