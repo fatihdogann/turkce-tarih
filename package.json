@@ -1,6 +1,6 @@
 {
   "name": "turkce-tarih",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Zero-dependency Turkish natural-language date/time parser (library + CLI). Parses expressions like \"yarın akşam 7'de\" into Date objects.",
   "type": "module",
   "engines": {
@@ -29,6 +29,9 @@
   },
   "keywords": [
     "turkish",
+    "türkçe",
+    "turkce",
+    "tarih",
     "date",
     "time",
     "parser",
